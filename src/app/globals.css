@@ -1,26 +1,44 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* -----------------------------------------------------------------------
+ * BRAND THEME — TÓLÚ KÍFÀ
+ * -----------------------------------------------------------------------
+ * Colors were sampled directly from the founder's logo and size-chart
+ * artwork (see stitch_integrated_fashion_retail_platform/tk.jpeg). Unlike a
+ * generic app, this brand has ONE fixed look (cream + olive) rather than a
+ * light/dark toggle, so these are the only color variables in the app.
+ *
+ * The `@theme` block below is Tailwind v4's way of turning CSS variables
+ * into utility classes automatically — defining `--color-olive` here is
+ * what makes classes like `bg-olive`, `text-olive`, `border-olive` work
+ * anywhere in the app. See https://tailwindcss.com/docs/theme
+ * ------------------------------------------------------------------- */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@theme {
+  --color-olive: #515b38; /* primary brand color — from the logo background */
+  --color-olive-dark: #484e22; /* darker accent, used for text on cream */
+  --color-cream: #f7f6f0; /* light surface color, used for page backgrounds */
+  --color-cream-dark: #ece9de; /* slightly deeper cream, for subtle borders/cards */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Font families are wired up as CSS variables by next/font in
+   * src/app/layout.tsx, then mapped to Tailwind names here so the rest of
+   * the app can just use `font-display`, `font-heading`, `font-sans`. */
+  --font-display: var(--font-bodoni-moda);
+  --font-heading: var(--font-syne);
+  --font-sans: var(--font-hanken-grotesk);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-olive-dark);
 }
+
+/* Note on the ₦ (Naira sign) currency symbol: our webfonts (Hanken Grotesk,
+ * Bodoni Moda, Syne) don't reliably include a glyph for it, which can make
+ * a price render as if it has a strikethrough through it. Rather than
+ * patch that here with CSS (a `unicode-range` @font-face override was
+ * tried and turned out to be unreliable — next/font's own generated
+ * @font-face rules don't have a predictable cascade order relative to
+ * this file), it's fixed once, robustly, in the <Price> component —
+ * see src/components/site/Price.tsx. Always render a price through that
+ * component rather than a plain string. */

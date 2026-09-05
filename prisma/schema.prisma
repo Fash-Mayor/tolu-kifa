@@ -1,0 +1,227 @@
+// =============================================================================
+// PRISMA SCHEMA
+// =============================================================================
+// This file is the single source of truth for the database structure.
+// Prisma reads this file to:
+//   1. Generate a type-safe database client (`npx prisma generate`) that the
+//      rest of the app imports from "@/lib/prisma" to read/write data.
+//   2. Create/update the actual database tables to match (`npx prisma
+//      migrate dev`) whenever you change a model below.
+//
+// New to Prisma? Think of each `model` block below as one database table.
+// Each field inside it is one column. The `@relation` bits describe foreign
+// keys (e.g. "an OrderItem belongs to one OrderRequest").
+//
+// Full docs: https://www.prisma.io/docs
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // We use Postgres in production (e.g. a free database from neon.com or
+  // railway.app). See ../.env.example for how to set DATABASE_URL.
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// ADMIN AUTH
+// -----------------------------------------------------------------------------
+// There is exactly ONE type of logged-in user in this whole app: the founder,
+// via the admin panel. Shoppers never create accounts (see project README).
+// -----------------------------------------------------------------------------
+
+model AdminUser {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  // Never store plain-text passwords! This holds a bcrypt hash produced by
+  // `prisma/seed.ts` (or a future "change password" feature) — see
+  // src/lib/auth.ts for how it's checked at login.
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  sessions     AdminSession[]
+}
+
+// A row here is created every time the founder logs in, and deleted when
+// they log out (or once `expiresAt` has passed). The browser only ever
+// holds this row's `id` — as an httpOnly cookie — never the password.
+// See src/lib/auth.ts for the full explanation of this pattern.
+model AdminSession {
+  id          String    @id @default(uuid())
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// SHOP: PRODUCTS
+// -----------------------------------------------------------------------------
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  // Used in the product page URL, e.g. /shop/silk-wrap-dress — must be
+  // unique and URL-safe (lowercase, hyphens instead of spaces).
+  slug        String   @unique
+  description String
+  // Money is stored as a whole-number count of the smallest currency unit
+  // (e.g. kobo, or cents) instead of a decimal, so rounding errors can never
+  // creep in. See src/lib/currency.ts for how this is formatted for display
+  // (and for the one place you'd change to switch currency/symbol).
+  priceInMinorUnits Int
+  // A short label shown on the shop grid/filters, e.g. "Dresses", "Suits".
+  // Deliberately a plain string (not a separate Category table) to keep
+  // this simple — the founder types whatever category name she wants when
+  // adding a product in the admin panel.
+  category    String
+  // Which size chart applies to this product — see SizeChartRow below.
+  sizeChartCategory SizeChartCategory @default(TOPS)
+  isFeatured  Boolean  @default(false)
+  // Soft "delete": inactive products stay in the database (so old orders
+  // still make sense) but are hidden from the public shop.
+  isActive    Boolean  @default(true)
+  sizes       ProductSize[]
+  images      ProductImage[]
+  orderItems  OrderItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// One row per size the product is available in, with its own stock count,
+// e.g. Product "Silk Wrap Dress" -> ProductSize("UK 10", stock: 3).
+model ProductSize {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String
+  stock     Int     @default(0)
+
+  @@unique([productId, label])
+}
+
+// One row per photo of a product. A product usually has several (front,
+// back, detail shot...); sortOrder controls the order they're displayed in.
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  sortOrder Int     @default(0)
+}
+
+// -----------------------------------------------------------------------------
+// GALLERY ("Archive" on the public site) — past work, not for sale
+// -----------------------------------------------------------------------------
+
+model GalleryImage {
+  id            String   @id @default(uuid())
+  url           String
+  caption       String?
+  // Optional free-text grouping, e.g. "AW24 Collection" — shown as a tag,
+  // not a strict category like Product.category.
+  collectionTag String?
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// SIZE CHARTS
+// -----------------------------------------------------------------------------
+// Digitized from the founder's original size-chart images
+// (stitch_integrated_fashion_retail_platform/tksccd.png and tkscp.png) so
+// they render as a real, theme-matched table and can be edited from the
+// admin panel later without needing a designer to redo an image.
+// -----------------------------------------------------------------------------
+
+enum SizeChartCategory {
+  TOPS // Dresses / Shirts / Tops / Suits — has a bust measurement
+  PANTS // Trousers — waist + hip only, no bust column
+}
+
+model SizeChartRow {
+  id        String            @id @default(uuid())
+  category  SizeChartCategory
+  ukSize    String
+  usSize    String
+  // Bust only applies to the TOPS chart — left empty (null) for PANTS rows.
+  bustInches  Int?
+  waistInches Int
+  hipInches   Int
+  sortOrder Int               @default(0)
+}
+
+// -----------------------------------------------------------------------------
+// ORDERS (no online payment — see README "Order flow")
+// -----------------------------------------------------------------------------
+
+enum OrderStatus {
+  NEW // just submitted by the customer, founder hasn't looked yet
+  CONTACTED // founder has reached out to arrange payment/delivery
+  CONFIRMED // payment/details agreed
+  IN_PRODUCTION
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+model OrderRequest {
+  id              String      @id @default(uuid())
+  // Human-friendly reference the customer can quote, e.g. TK-20260905-4821.
+  // Generated in src/lib/orders.ts — NOT the same as the database `id`.
+  orderNumber     String      @unique
+  customerName    String
+  email           String
+  phone           String
+  deliveryAddress String
+  status          OrderStatus @default(NEW)
+  // Free-text space for the founder to jot down what was agreed on a call,
+  // shipping tracking numbers, etc. Only ever visible in the admin panel.
+  notes           String?
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id             String       @id @default(uuid())
+  orderRequestId String
+  orderRequest   OrderRequest @relation(fields: [orderRequestId], references: [id], onDelete: Cascade)
+  // Kept as an optional link (not required) and paired with a name/price
+  // *snapshot* below, so that if a product is later renamed, re-priced, or
+  // even deleted, this historical order line still reads correctly.
+  productId      String?
+  product        Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName    String
+  size           String
+  quantity       Int
+  priceInMinorUnits Int
+}
+
+// -----------------------------------------------------------------------------
+// CONSULTATION REQUESTS
+// -----------------------------------------------------------------------------
+
+enum ConsultationStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
+model ConsultationRequest {
+  id                String             @id @default(uuid())
+  name              String
+  email             String
+  phone             String
+  projectType       String
+  budgetRange       String?
+  timeline          String?
+  description       String
+  // Path/URL to an optional reference photo the customer attached, saved
+  // via the same src/lib/storage.ts helper used for admin image uploads.
+  referenceImageUrl String?
+  status            ConsultationStatus @default(NEW)
+  createdAt         DateTime           @default(now())
+}

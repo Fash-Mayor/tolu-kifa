@@ -32,9 +32,17 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the template — this one SHOULD be committed so anyone cloning
+# the repo knows which variables they need to set.
+!.env.example
 
 # vercel
 .vercel
+
+# images uploaded through the admin panel at runtime (see src/lib/storage.ts)
+# — these belong on disk/in cloud storage, not in git.
+/public/uploads
+
 
 # typescript
 *.tsbuildinfo
