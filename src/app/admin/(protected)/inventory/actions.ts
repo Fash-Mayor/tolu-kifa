@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { refresh } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { saveUploadedImage } from "@/lib/storage";
 import { toMinorUnits } from "@/lib/currency";
@@ -130,10 +131,15 @@ export async function updateProduct(productId: string, formData: FormData) {
       })),
     });
   }
+
+  // Without this, the edit page stays on the pre-save values until the
+  // next real navigation — see the comment in orders/[id]/actions.ts.
+  refresh();
 }
 
 export async function deleteProductImage(imageId: string) {
   await prisma.productImage.delete({ where: { id: imageId } });
+  refresh();
 }
 
 export async function deleteProduct(productId: string) {

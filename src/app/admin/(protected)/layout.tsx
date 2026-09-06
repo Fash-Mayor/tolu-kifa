@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/admin/gallery", label: "Gallery" },
   { href: "/admin/size-charts", label: "Size Charts" },
   { href: "/admin/consultations", label: "Consultations" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 export default async function ProtectedAdminLayout({

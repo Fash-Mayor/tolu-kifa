@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { refresh } from "next/cache";
 import { saveUploadedImage } from "@/lib/storage";
 
 export async function uploadGalleryImages(formData: FormData) {
@@ -24,10 +25,15 @@ export async function uploadGalleryImages(formData: FormData) {
     });
     nextSortOrder += 1;
   }
+
+  // Without this, the gallery page stays on the pre-upload list until the
+  // next real navigation — see the comment in orders/[id]/actions.ts.
+  refresh();
 }
 
 export async function deleteGalleryImage(imageId: string) {
   await prisma.galleryImage.delete({ where: { id: imageId } });
+  refresh();
 }
 
 /**
@@ -50,4 +56,6 @@ export async function moveGalleryImage(imageId: string, direction: "up" | "down"
     prisma.galleryImage.update({ where: { id: current.id }, data: { sortOrder: neighbor.sortOrder } }),
     prisma.galleryImage.update({ where: { id: neighbor.id }, data: { sortOrder: current.sortOrder } }),
   ]);
+
+  refresh();
 }

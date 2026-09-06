@@ -210,6 +210,24 @@ enum ConsultationStatus {
   CLOSED
 }
 
+// -----------------------------------------------------------------------------
+// SITE SETTINGS
+// -----------------------------------------------------------------------------
+// Singleton table (exactly one row, id always "singleton") for the handful
+// of public-site knobs the founder should be able to change herself without
+// a code deploy — currently just the landing page hero image. See
+// src/lib/settings.ts for how a row is read/created, and
+// src/app/admin/(protected)/settings for the admin form that edits it.
+// -----------------------------------------------------------------------------
+
+model SiteSettings {
+  id            String   @id @default("singleton")
+  // Falls back to the placeholder graphic (see src/lib/settings.ts) until
+  // the founder uploads a real photo from Admin -> Settings.
+  heroImageUrl  String?
+  updatedAt     DateTime @updatedAt
+}
+
 model ConsultationRequest {
   id                String             @id @default(uuid())
   name              String

@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { refresh } from "next/cache";
 import type { SizeChartCategory } from "@prisma/client";
 
 // One form covers every row of a chart at once (all 9 rows), with inputs
@@ -23,4 +24,6 @@ export async function updateSizeChart(category: SizeChartCategory, formData: For
       })
     )
   );
+
+  refresh();
 }

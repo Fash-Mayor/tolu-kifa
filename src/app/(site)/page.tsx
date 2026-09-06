@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getSiteSettings, DEFAULT_HERO_IMAGE_URL } from "@/lib/settings";
 import { ProductCard } from "@/components/site/ProductCard";
 import { SmartImage } from "@/components/site/SmartImage";
 
@@ -25,6 +26,10 @@ export default async function LandingPage() {
     take: 4,
   });
 
+  // Editable from Admin -> Settings; falls back to the placeholder graphic
+  // until the founder uploads a real photo.
+  const { heroImageUrl } = await getSiteSettings();
+
   return (
     <div>
       {/* ---------------------------------------------------------------- */}
@@ -32,7 +37,7 @@ export default async function LandingPage() {
       {/* ---------------------------------------------------------------- */}
       <section className="relative flex h-[70vh] min-h-[420px] items-end overflow-hidden">
         <SmartImage
-          src="/placeholders/hero.svg"
+          src={heroImageUrl ?? DEFAULT_HERO_IMAGE_URL}
           alt="TÓLÚ KÍFÀ"
           fill
           sizes="100vw"
