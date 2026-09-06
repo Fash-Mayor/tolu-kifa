@@ -6,42 +6,42 @@
 // reference photos) calls `saveUploadedImage()` below and stores the URL it
 // returns in the database. No other file touches the filesystem directly.
 //
-// Right now this saves files onto local disk, inside /public/uploads/.
-// That's genuinely fine for local development and for hosting on a normal
-// always-on Node server (a VPS, Railway, Render, etc.).
-//
-// ⚠️ IMPORTANT if you deploy to Vercel (or any serverless host): serverless
-// functions get a fresh, READ-ONLY filesystem on every request, so anything
-// written to disk here would vanish immediately. Before going live on a
-// platform like that, replace the inside of `saveUploadedImage` with a call
-// to an image host such as Cloudinary or S3 (both have a generous free
-// tier and a simple upload API). Because every caller only ever imports this
-// one function, that's the ONLY file you'd need to change — nothing else in
-// the app needs to know or care where images physically live.
+// This uploads to Cloudinary and returns its CDN `secure_url`. Reads config
+// from the CLOUDINARY_URL env var (cloudinary://<key>:<secret>@<cloud_name>)
+// — the SDK picks that up automatically, no explicit config() call needed.
+// See .env.example for how to set it.
 // -----------------------------------------------------------------------------
 
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
 import { randomUUID } from "crypto";
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
 /**
  * Saves an uploaded file (as received from a <form encType="multipart/form-data">
  * via a Server Action's FormData) and returns the URL to use as an <img src>.
  */
 export async function saveUploadedImage(file: File): Promise<string> {
-  // Make sure the folder exists — it's git-ignored (see .gitignore) so it
-  // won't exist yet on a freshly cloned copy of the project.
-  await mkdir(UPLOAD_DIR, { recursive: true });
-
-  const originalExtension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const safeFilename = `${randomUUID()}.${originalExtension}`;
-
   const fileContents = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(UPLOAD_DIR, safeFilename), fileContents);
 
-  // Anything inside /public is served by Next.js at the matching URL path,
-  // so this is exactly the address the browser will load the image from.
-  return `/uploads/${safeFilename}`;
+  const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "tolu-kifa",
+        public_id: randomUUID(),
+        // Uploads can be a product photo, a gallery photo, or a consultation
+        // reference photo — resource_type "auto" lets Cloudinary handle
+        // whatever image format shows up without us sniffing it ourselves.
+        resource_type: "auto",
+      },
+      (error, uploadResult) => {
+        if (error || !uploadResult) {
+          reject(error ?? new Error("Cloudinary upload returned no result"));
+          return;
+        }
+        resolve(uploadResult);
+      }
+    );
+    uploadStream.end(fileContents);
+  });
+
+  return result.secure_url;
 }

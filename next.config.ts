@@ -19,7 +19,12 @@ const nextConfig: NextConfig = {
     //
     // Example, if you moved to Cloudinary:
     // remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com"
+      }
+    ],
   },
 };
 
